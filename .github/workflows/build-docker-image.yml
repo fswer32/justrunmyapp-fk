@@ -3,7 +3,8 @@ name: JustRunMy-renew
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 19 * * *'
+    - cron: '0 */9 * * *'
+    
 
 jobs:
   renew:
