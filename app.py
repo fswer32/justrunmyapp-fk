@@ -449,7 +449,7 @@ def renew(sb) -> bool:
 
     print("🌐 进入控制面板: https://justrunmy.app/panel/applications")
     sb.open("https://justrunmy.app/panel/applications")
-    time.sleep(3)
+    time.sleep(30)
 
     print("🖱️ 查找应用")
     try:
