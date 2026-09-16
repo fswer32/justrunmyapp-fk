@@ -3,7 +3,7 @@ name: JustRunMy-renew
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 19 * * *'
+    - cron: '0 */9 * * *'
 
 jobs:
   renew:
@@ -14,6 +14,9 @@ jobs:
       actions: write
 
     steps:
+      # -----------------------------
+      # 📥 Checkout
+      # -----------------------------
       - name: 📥 Checkout
         uses: actions/checkout@v4
 
@@ -33,9 +36,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          key: playwright-${{ runner.os }}
           restore-keys: |
-            playwright-${{ runner.os }}-
+            playwright-${{ runner.os }}
 
       # -----------------------------
       # 🧰 Chrome / Chromedriver 缓存
@@ -44,7 +47,6 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            /usr/bin/google-chrome
             ~/.cache/seleniumbase
           key: chrome-${{ runner.os }}
           restore-keys: |
@@ -116,8 +118,10 @@ jobs:
             fi
           done
 
-
-       - name: Create keep-alive commit
+      # -----------------------------
+      # 🔄 Keepalive Commit
+      # -----------------------------
+      - name: Create keep-alive commit
         run: |
           echo "Last backup: $(date -u '+%Y-%m-%d %H:%M:%S UTC') | ID: $(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 8)" > keepalive.md
           git config user.name "github-actions[bot]"
