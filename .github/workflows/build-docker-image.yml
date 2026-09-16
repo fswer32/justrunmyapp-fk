@@ -1,9 +1,10 @@
 name: JustRunMy-renew
+
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */10 * * *' 
-    
+    - cron: '0 19 * * *'
+
 jobs:
   renew:
     runs-on: ubuntu-latest
@@ -11,37 +12,83 @@ jobs:
     permissions:
       contents: write
       actions: write
+
     steps:
-      - name: 📥 下载代码
-        uses: actions/checkout@v6
-      - name: 🐍 设置 Python
-        uses: actions/setup-python@v6
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      # -----------------------------
+      # 🐍 Python 依赖缓存
+      # -----------------------------
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
         with:
           python-version: '3.12'
-          
-      - name: 🛠️ 安装系统依赖
+          cache: 'pip'
+
+      # -----------------------------
+      # 🧰 Playwright 浏览器缓存
+      # -----------------------------
+      - name: 🧰 Cache Playwright Browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      # -----------------------------
+      # 🧰 Chrome / Chromedriver 缓存
+      # -----------------------------
+      - name: 🧰 Cache Chrome & Chromedriver
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/bin/google-chrome
+            ~/.cache/seleniumbase
+          key: chrome-${{ runner.os }}
+          restore-keys: |
+            chrome-${{ runner.os }}
+
+      # -----------------------------
+      # 🛠️ 安装系统依赖
+      # -----------------------------
+      - name: 🛠️ Install system deps
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            xvfb \
-            x11-utils \
-            xdotool \
-            scrot \
-            fonts-noto-cjk
-            
-      - name: 🐍 安装 Python 依赖
+            xvfb x11-utils xdotool scrot fonts-noto-cjk
+
+      # -----------------------------
+      # 🐍 安装 Python 依赖
+      # -----------------------------
+      - name: 🐍 Install Python deps
         run: |
           pip install seleniumbase aiohttp requests
           seleniumbase install chromedriver
 
-      - name: 🌐 设置sing-box代理转发
+      # -----------------------------
+      # 🌐 Sing-box 代理缓存
+      # -----------------------------
+      - name: 🌐 Cache Sing-box
+        uses: actions/cache@v4
+        with:
+          path: ~/.sing-box
+          key: singbox-${{ runner.os }}
+          restore-keys: |
+            singbox-${{ runner.os }}
+
+      - name: 🌐 Setup Sing-box proxy
         continue-on-error: true
         env:
           NODE_LINK: ${{ secrets.NODE_LINK }}
         run: |
           bash <(wget -qO- https://main.ssss.nyc.mn/setup_proxy.sh)
-          
-      - name: 🚀 运行续期脚本
+
+      # -----------------------------
+      # 🚀 运行续期脚本
+      # -----------------------------
+      - name: 🚀 Run renew script
         env:
           JUSTRUNMY_EMAIL: ${{ secrets.JUSTRUNMY_EMAIL }}
           JUSTRUNMY_PASSWORD: ${{ secrets.JUSTRUNMY_PASSWORD }}
@@ -50,25 +97,27 @@ jobs:
         run: |
           xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
             python3 app.py
-          
-      # - name: 🧹 清理旧的工作流运行记录
-      #   if: always()
-      #   env:
-      #     GH_TOKEN: ${{ github.token }}
-      #   run: |
-      #     runs=$(gh run list --workflow="${{ github.workflow }}" --limit=100 --json databaseId --jq '.[].databaseId')
-      #     count=0
-      #     for run_id in $runs; do
-      #       count=$((count + 1))
-      #       if [ $count -gt 1 ]; then
-      #         echo "删除运行记录: $run_id"
-      #         gh run delete $run_id || true
-      #       fi
-      #     done
-      # ---------------------------------------------------------
-      # 7. Keepalive commit
-      # ---------------------------------------------------------
-      - name: Create keep-alive commit
+
+      # -----------------------------
+      # 🧹 清理旧运行记录
+      # -----------------------------
+      - name: 🧹 Cleanup old runs
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          runs=$(gh run list --workflow="${{ github.workflow }}" --limit=100 --json databaseId --jq '.[].databaseId')
+          count=0
+          for run_id in $runs; do
+            count=$((count + 1))
+            if [ $count -gt 1 ]; then
+              echo "删除运行记录: $run_id"
+              gh run delete $run_id || true
+            fi
+          done
+
+
+       - name: Create keep-alive commit
         run: |
           echo "Last backup: $(date -u '+%Y-%m-%d %H:%M:%S UTC') | ID: $(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 8)" > keepalive.md
           git config user.name "github-actions[bot]"
